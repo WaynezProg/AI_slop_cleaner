@@ -232,7 +232,7 @@ def _apply_stale_rules(
     for record in records:
         if results_by_path[record.relative_path].category != "canonical":
             continue
-        active_by_key[_document_key(record)].append(record)
+        active_by_key[_stale_document_key(record)].append(record)
 
     for group in active_by_key.values():
         if len(group) < 2:
@@ -250,7 +250,7 @@ def _apply_stale_rules(
                 confidence=0.85,
                 signals=[
                     {
-                        "name": "superseded_same_document_key",
+                        "name": "superseded_same_stale_key",
                         "canonical_path": canonical.relative_path,
                     }
                 ],
@@ -268,6 +268,18 @@ def _document_key(record: DocumentRecord) -> str:
     else:
         value = PurePosixPath(record.relative_path).stem
     value = value.lower()
+    value = re.sub(r"\b(?:v|version)[-_ ]*\d+(?:\.\d+)*\b", " ", value)
+    value = re.sub(r"\b\d{4}[-_ ]?\d{2}[-_ ]?\d{2}\b", " ", value)
+    value = re.sub(r"\b\d{8}\b", " ", value)
+    tokens = re.findall(r"[a-z0-9]+", value)
+    filtered = [token for token in tokens if token not in DOCUMENT_KEY_STOP_TOKENS]
+    local_key = "".join(filtered) or PurePosixPath(record.relative_path).stem.lower()
+    parent_key = _document_parent_key(record)
+    return f"{parent_key}/{local_key}" if parent_key else local_key
+
+
+def _stale_document_key(record: DocumentRecord) -> str:
+    value = PurePosixPath(record.relative_path).stem.lower()
     value = re.sub(r"\b(?:v|version)[-_ ]*\d+(?:\.\d+)*\b", " ", value)
     value = re.sub(r"\b\d{4}[-_ ]?\d{2}[-_ ]?\d{2}\b", " ", value)
     value = re.sub(r"\b\d{8}\b", " ", value)

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from ai_slop_cleaner.classifier import classify_records
 from ai_slop_cleaner.scanner import scan_documents
 
@@ -110,6 +112,28 @@ def test_same_title_in_different_directories_does_not_group(tmp_path) -> None:
     assert {result.path: result.category for result in results} == {
         "backend/auth.md": "canonical",
         "frontend/auth.md": "canonical",
+    }
+
+
+def test_same_directory_same_heading_distinct_files_do_not_become_stale(tmp_path) -> None:
+    login = tmp_path / "login.md"
+    roles = tmp_path / "roles.md"
+    login.write_text(
+        "# Auth\nThe login flow must support passkeys.\n",
+        encoding="utf-8",
+    )
+    roles.write_text(
+        "# Auth\nAdmins must assign roles.\n",
+        encoding="utf-8",
+    )
+    os.utime(login, (1_700_000_000, 1_700_000_000))
+    os.utime(roles, (1_800_000_000, 1_800_000_000))
+
+    results = classify_records(scan_documents(tmp_path))
+
+    assert {result.path: result.category for result in results} == {
+        "login.md": "canonical",
+        "roles.md": "canonical",
     }
 
 

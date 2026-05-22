@@ -76,19 +76,25 @@ def ensure_current_manifest(
     *,
     rescan: bool = False,
 ) -> dict[str, Any]:
+    root = Path(target).resolve()
     try:
-        manifest = load_manifest(target)
+        manifest = load_manifest(root)
     except FileNotFoundError as error:
         if rescan:
-            return classify_path(target)
-        raise StaleManifestError("Manifest is missing; run classify with rescan enabled.") from error
+            return classify_path(root)
+        raise StaleManifestError(
+            f"Manifest not found: {root / MANIFEST_NAME}. "
+            f"Run ai-slop classify {root} or pass --rescan to clean."
+        ) from error
 
-    if manifest_is_current(target, manifest):
+    if manifest_is_current(root, manifest):
         return manifest
 
     if rescan:
-        return classify_path(target, max_bytes=_manifest_max_bytes(manifest))
-    raise StaleManifestError("Manifest is stale; run classify with rescan enabled.")
+        return classify_path(root, max_bytes=_manifest_max_bytes(manifest))
+    raise StaleManifestError(
+        f"Manifest is stale. Run ai-slop classify {root} or pass --rescan to clean."
+    )
 
 
 def _manifest_max_bytes(manifest: dict[str, Any]) -> int:

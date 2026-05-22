@@ -13,4 +13,4 @@ ai-slop restore <quarantine-run-path>
 
 AI Slop Cleaner is deterministic, offline, and does not delete originals.
 
-The `classify`, `clean`, and `restore` commands are reserved CLI contracts. Their implementations are not wired yet.
+The `classify`, `clean`, and `restore` commands are implemented and print machine-readable JSON.

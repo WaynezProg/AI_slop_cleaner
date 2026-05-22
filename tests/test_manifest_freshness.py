@@ -81,8 +81,11 @@ def test_manifest_is_current_returns_false_when_oversized_content_changes_same_s
 
 
 def test_ensure_current_manifest_raises_when_manifest_missing_and_rescan_false(tmp_path) -> None:
-    with pytest.raises(StaleManifestError, match="missing"):
+    with pytest.raises(StaleManifestError, match="Manifest not found") as error:
         ensure_current_manifest(tmp_path)
+    assert f"Run ai-slop classify {tmp_path}" in str(error.value)
+    assert "pass --rescan to clean" in str(error.value)
+    assert "classify with rescan enabled" not in str(error.value)
 
 
 def test_ensure_current_manifest_raises_when_manifest_stale_and_rescan_false(tmp_path) -> None:
@@ -91,8 +94,11 @@ def test_ensure_current_manifest_raises_when_manifest_stale_and_rescan_false(tmp
     classify_path(tmp_path)
     doc_path.write_text("# Updated Spec\n", encoding="utf-8")
 
-    with pytest.raises(StaleManifestError, match="stale"):
+    with pytest.raises(StaleManifestError, match="Manifest is stale") as error:
         ensure_current_manifest(tmp_path)
+    assert f"Run ai-slop classify {tmp_path}" in str(error.value)
+    assert "pass --rescan to clean" in str(error.value)
+    assert "classify with rescan enabled" not in str(error.value)
 
 
 def test_ensure_current_manifest_regenerates_missing_manifest_when_rescan_true(tmp_path) -> None:

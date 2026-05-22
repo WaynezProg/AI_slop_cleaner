@@ -168,6 +168,70 @@ def test_apply_cleanup_keeps_recoverable_move_log_when_later_move_fails(tmp_path
     assert (tmp_path / "zz-low-value.md").is_file()
 
 
+def test_restore_recovers_file_when_move_log_write_fails_after_move(tmp_path, monkeypatch) -> None:
+    import ai_slop_cleaner.quarantine as quarantine
+
+    (tmp_path / "a.md").write_text("# Same\n", encoding="utf-8")
+    (tmp_path / "b.md").write_text("# Same\n", encoding="utf-8")
+    manifest = classify_path(tmp_path)
+    moved_path = next(entry["path"] for entry in manifest["files"] if entry["category"] == "duplicate")
+    real_write_json = quarantine._write_json
+
+    def fail_after_successful_move(path, data):
+        if (
+            path.name == "move-log.json"
+            and isinstance(data, list)
+            and any(entry.get("status") == "moved" for entry in data if isinstance(entry, dict))
+        ):
+            raise OSError("forced move-log write failure")
+        real_write_json(path, data)
+
+    monkeypatch.setattr(quarantine, "_write_json", fail_after_successful_move)
+
+    with pytest.raises(OSError, match="forced move-log write failure"):
+        apply_cleanup(tmp_path, manifest)
+
+    run_path = next((tmp_path / ".ai-slop" / "quarantine").iterdir())
+    assert not (tmp_path / moved_path).exists()
+    assert (run_path / moved_path).is_file()
+
+    monkeypatch.setattr(quarantine, "_write_json", real_write_json)
+    result = restore_quarantine(run_path)
+
+    assert result["restored"] == [{"path": moved_path}]
+    assert result["skipped"] == []
+    assert (tmp_path / moved_path).is_file()
+
+
+def test_plan_cleanup_rejects_ai_slop_symlink(tmp_path) -> None:
+    external = tmp_path / "external"
+    external.mkdir()
+    (tmp_path / ".ai-slop").symlink_to(external, target_is_directory=True)
+    (tmp_path / "notes.md").write_text("todo\n", encoding="utf-8")
+    manifest = classify_path(tmp_path)
+
+    with pytest.raises(RuntimeError, match=".ai-slop"):
+        plan_cleanup(tmp_path, manifest)
+
+    assert not (external / "cleanup-plan.json").exists()
+
+
+def test_apply_cleanup_rejects_quarantine_symlink(tmp_path) -> None:
+    external = tmp_path / "external"
+    external.mkdir()
+    internal = tmp_path / ".ai-slop"
+    internal.mkdir()
+    (internal / "quarantine").symlink_to(external, target_is_directory=True)
+    (tmp_path / "notes.md").write_text("todo\n", encoding="utf-8")
+    manifest = classify_path(tmp_path)
+
+    with pytest.raises(RuntimeError, match="quarantine"):
+        apply_cleanup(tmp_path, manifest)
+
+    assert (tmp_path / "notes.md").is_file()
+    assert list(external.iterdir()) == []
+
+
 def test_restore_quarantine_uses_apply_target_not_manifest_target_path(tmp_path) -> None:
     target = tmp_path / "target"
     other = tmp_path / "other"
@@ -245,3 +309,23 @@ def test_restore_quarantine_skips_destination_with_symlink_parent(tmp_path) -> N
     assert result["skipped"] == [{"path": "docs/scratch.md", "reason": "unsafe_destination"}]
     assert not (external / "scratch.md").exists()
     assert (run_path / "docs" / "scratch.md").is_file()
+
+
+def test_restore_quarantine_skips_symlink_quarantine_source(tmp_path) -> None:
+    external = tmp_path / "external.md"
+    external.write_text("# External\n", encoding="utf-8")
+    (tmp_path / "a.md").write_text("# Same\n", encoding="utf-8")
+    (tmp_path / "b.md").write_text("# Same\n", encoding="utf-8")
+    manifest = classify_path(tmp_path)
+    run_path = apply_cleanup(tmp_path, manifest)
+    moved_path = next(entry["path"] for entry in manifest["files"] if entry["category"] == "duplicate")
+    source = run_path / moved_path
+    source.unlink()
+    source.symlink_to(external)
+
+    result = restore_quarantine(run_path)
+
+    assert result["restored"] == []
+    assert result["skipped"] == [{"path": moved_path, "reason": "unsafe_quarantine_source"}]
+    assert (tmp_path / moved_path).exists() is False
+    assert source.is_symlink()

@@ -39,6 +39,12 @@ def load_manifest(target: str | Path) -> dict[str, Any]:
 
 
 def manifest_is_current(target: str | Path, manifest: dict[str, Any]) -> bool:
+    root = Path(target).resolve()
+    if manifest.get("schema_version") != 1:
+        return False
+    if manifest.get("target_path") != str(root):
+        return False
+
     manifest_files = manifest.get("files")
     if not isinstance(manifest_files, list):
         return False

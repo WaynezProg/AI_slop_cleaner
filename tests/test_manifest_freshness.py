@@ -80,6 +80,22 @@ def test_manifest_is_current_returns_false_when_oversized_content_changes_same_s
     assert manifest_is_current(tmp_path, manifest) is False
 
 
+def test_manifest_is_current_returns_false_for_schema_mismatch(tmp_path) -> None:
+    (tmp_path / "spec.md").write_text("# Spec\n", encoding="utf-8")
+    manifest = classify_path(tmp_path)
+    manifest["schema_version"] = 2
+
+    assert manifest_is_current(tmp_path, manifest) is False
+
+
+def test_manifest_is_current_returns_false_for_target_path_mismatch(tmp_path) -> None:
+    (tmp_path / "spec.md").write_text("# Spec\n", encoding="utf-8")
+    manifest = classify_path(tmp_path)
+    manifest["target_path"] = str(tmp_path / "other")
+
+    assert manifest_is_current(tmp_path, manifest) is False
+
+
 def test_ensure_current_manifest_raises_when_manifest_missing_and_rescan_false(tmp_path) -> None:
     with pytest.raises(StaleManifestError, match="Manifest not found") as error:
         ensure_current_manifest(tmp_path)

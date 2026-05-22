@@ -46,13 +46,15 @@ def plan_cleanup(
             }
         )
 
+    internal_path = root / ".ai-slop"
+    _ensure_internal_directory(internal_path)
     plan = {
         "created_at": created_at,
         "target_path": str(root),
         "min_confidence": min_confidence,
         "moves": sorted(moves, key=lambda move: move["original_path"]),
     }
-    _write_json(root / ".ai-slop" / "cleanup-plan.json", plan)
+    _write_json(internal_path / "cleanup-plan.json", plan)
     return plan
 
 
@@ -64,7 +66,9 @@ def apply_cleanup(
 ) -> Path:
     root = Path(target).resolve()
     plan = plan_cleanup(root, manifest, min_confidence=min_confidence)
-    run_path = _unique_run_path(root / ".ai-slop" / "quarantine")
+    quarantine_root = root / ".ai-slop" / "quarantine"
+    _ensure_internal_directory(quarantine_root)
+    run_path = _unique_run_path(quarantine_root)
     run_path.mkdir(parents=True)
     _write_json(run_path / "run.json", {"target_path": str(root), "created_at": _utc_now()})
     _write_json(run_path / "manifest.json", manifest)
@@ -104,8 +108,6 @@ def restore_quarantine(quarantine_run_path: str | Path) -> dict[str, Any]:
     for entry in move_log:
         if not isinstance(entry, dict):
             raise RuntimeError("Quarantine move log contains an invalid entry.")
-        if entry.get("status") != "moved":
-            continue
         original_path = entry.get("original_path")
         if not isinstance(original_path, str):
             raise RuntimeError("Quarantine move log contains an invalid entry.")
@@ -117,6 +119,10 @@ def restore_quarantine(quarantine_run_path: str | Path) -> dict[str, Any]:
             continue
 
         source = run_path / quarantine_path
+        status = entry.get("status")
+        source_exists = source.exists() or source.is_symlink()
+        if status != "moved" and not source_exists:
+            continue
         destination = target_path / original_path
         if destination.exists() or destination.is_symlink():
             skipped.append({"path": original_path, "reason": "destination_exists"})
@@ -124,8 +130,11 @@ def restore_quarantine(quarantine_run_path: str | Path) -> dict[str, Any]:
         if not _is_safe_restore_destination(destination, target_path):
             skipped.append({"path": original_path, "reason": "unsafe_destination"})
             continue
-        if not source.exists():
+        if not source_exists:
             skipped.append({"path": original_path, "reason": "quarantine_source_missing"})
+            continue
+        if not _is_safe_quarantine_source(source, run_path):
+            skipped.append({"path": original_path, "reason": "unsafe_quarantine_source"})
             continue
 
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -143,6 +152,23 @@ def _unique_run_path(quarantine_root: Path) -> Path:
         candidate = quarantine_root / f"{timestamp}-{suffix}"
         suffix += 1
     return candidate
+
+
+def _ensure_internal_directory(path: Path) -> None:
+    if path.exists() or path.is_symlink():
+        if path.is_symlink():
+            raise RuntimeError(f"Unsafe internal directory is a symlink: {path}")
+        if not path.is_dir():
+            raise RuntimeError(f"Unsafe internal path is not a directory: {path}")
+        return
+
+    parent = path.parent
+    if parent.exists() or parent.is_symlink():
+        if parent.is_symlink():
+            raise RuntimeError(f"Unsafe internal directory parent is a symlink: {parent}")
+        if not parent.is_dir():
+            raise RuntimeError(f"Unsafe internal directory parent is not a directory: {parent}")
+    path.mkdir()
 
 
 def _load_move_log(run_path: Path) -> list[Any]:
@@ -187,6 +213,18 @@ def _is_safe_restore_destination(destination: Path, target_path: Path) -> bool:
             return False
         if cursor.exists() and not cursor.is_dir():
             return False
+    return True
+
+
+def _is_safe_quarantine_source(source: Path, run_path: Path) -> bool:
+    if source.is_symlink():
+        return False
+    if not source.is_file():
+        return False
+    try:
+        source.resolve(strict=True).relative_to(run_path)
+    except (OSError, ValueError):
+        return False
     return True
 
 

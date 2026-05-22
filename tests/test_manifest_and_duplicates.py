@@ -41,6 +41,26 @@ def test_copy_filename_loses_to_original_even_when_newer(tmp_path) -> None:
     assert results_by_path["spec-copy.md"].related_files == ["spec.md"]
 
 
+def test_exact_duplicate_canonical_prefers_newer_mtime_over_version_hint(tmp_path) -> None:
+    v1_path = tmp_path / "spec-v1.md"
+    v2_path = tmp_path / "spec-v2.md"
+    v1_path.write_text("# Spec\nSame content.\n", encoding="utf-8")
+    v2_path.write_text("# Spec\nSame content.\n", encoding="utf-8")
+
+    scanned = scan_documents(tmp_path)
+    shared_hash = scanned[0].hash
+    records = [
+        replace(record, hash=shared_hash, mtime=20.0 if record.relative_path == "spec-v1.md" else 10.0)
+        for record in scanned
+    ]
+
+    results = classify_records(records)
+
+    results_by_path = {result.path: result for result in results}
+    assert results_by_path["spec-v1.md"].category == "canonical"
+    assert results_by_path["spec-v2.md"].category == "duplicate"
+
+
 def test_canonical_true_outranks_status_final(tmp_path) -> None:
     canonical_path = tmp_path / "canonical.md"
     final_path = tmp_path / "final.md"
@@ -107,6 +127,7 @@ def test_manifest_preserves_scanner_error_evidence(tmp_path) -> None:
         extension=".bin",
         title=None,
         frontmatter={},
+        body_text="",
         normalized_text="",
         headings=[],
         references=[],

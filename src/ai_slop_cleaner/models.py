@@ -28,6 +28,7 @@ class DocumentRecord:
     extension: str
     title: str | None
     frontmatter: dict[str, str]
+    body_text: str
     normalized_text: str
     headings: list[str]
     references: list[str]

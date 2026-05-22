@@ -55,6 +55,28 @@ See [Bad](fake.md).
     assert records[0].references == ["good.md"]
 
 
+def test_scan_documents_body_text_preserves_punctuation_outside_fenced_code(tmp_path) -> None:
+    spec_path = tmp_path / "spec.md"
+    spec_path.write_text(
+        """---
+title: Auth Spec
+---
+The product must support SSO. Customers use it daily.
+
+```markdown
+The product must not support SSO.
+```
+""",
+        encoding="utf-8",
+    )
+
+    records = scan_documents(tmp_path)
+
+    assert len(records) == 1
+    assert "The product must support SSO. Customers use it daily." in records[0].body_text
+    assert "must not support SSO" not in records[0].body_text
+
+
 def test_scan_documents_skips_ai_slop_internal_folder(tmp_path) -> None:
     (tmp_path / "keep.md").write_text("# Keep\n", encoding="utf-8")
     internal_dir = tmp_path / ".ai-slop"

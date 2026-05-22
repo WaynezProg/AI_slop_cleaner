@@ -23,7 +23,7 @@ def test_classify_path_writes_manifest_and_returns_canonical_categories(tmp_path
     assert manifest["scanner_config"] == {"max_bytes": 1_000_000}
 
 
-def test_manifest_is_current_ignores_future_mtime_when_snapshot_matches(tmp_path) -> None:
+def test_manifest_is_current_returns_false_when_mtime_changes_even_if_hash_matches(tmp_path) -> None:
     doc_path = tmp_path / "spec.md"
     doc_path.write_text("# Spec\n", encoding="utf-8")
     manifest = classify_path(tmp_path)
@@ -31,7 +31,7 @@ def test_manifest_is_current_ignores_future_mtime_when_snapshot_matches(tmp_path
     newer_mtime = manifest["generated_at_epoch"] + 5
     os.utime(doc_path, (newer_mtime, newer_mtime))
 
-    assert manifest_is_current(tmp_path, manifest) is True
+    assert manifest_is_current(tmp_path, manifest) is False
 
 
 def test_manifest_is_current_returns_false_when_manifest_file_was_deleted(tmp_path) -> None:

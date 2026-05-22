@@ -43,7 +43,7 @@ def manifest_is_current(target: str | Path, manifest: dict[str, Any]) -> bool:
     if not isinstance(manifest_files, list):
         return False
 
-    manifest_snapshot: dict[str, tuple[str | None, int, float | None]] = {}
+    manifest_snapshot: dict[str, tuple[str | None, int, float]] = {}
     for entry in manifest_files:
         if not isinstance(entry, dict):
             return False
@@ -55,16 +55,16 @@ def manifest_is_current(target: str | Path, manifest: dict[str, Any]) -> bool:
             return False
         if file_hash is not None and not isinstance(file_hash, str):
             return False
-        if file_hash is None and not isinstance(mtime, int | float):
+        if not isinstance(mtime, int | float):
             return False
-        manifest_snapshot[path] = (file_hash, size, float(mtime) if file_hash is None else None)
+        manifest_snapshot[path] = (file_hash, size, float(mtime))
 
     max_bytes = _manifest_max_bytes(manifest)
     current_snapshot = {
         record.relative_path: (
             record.hash,
             record.size,
-            record.mtime if record.hash is None else None,
+            record.mtime,
         )
         for record in scan_documents(target, max_bytes=max_bytes)
     }

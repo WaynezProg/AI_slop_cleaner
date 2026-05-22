@@ -55,6 +55,21 @@ def test_clean_plan_refuses_stale_manifest_without_rescan(tmp_path) -> None:
     assert result.stdout == ""
 
 
+def test_clean_plan_refuses_manifest_when_only_mtime_changed(tmp_path) -> None:
+    seed_cleanup_target(tmp_path)
+    assert run_cli("classify", str(tmp_path)).returncode == 0
+    manifest = json.loads((tmp_path / MANIFEST_NAME).read_text(encoding="utf-8"))
+    touched = tmp_path / "same.md"
+    newer_mtime = manifest["generated_at_epoch"] + 5
+    os.utime(touched, (newer_mtime, newer_mtime))
+
+    result = run_cli("clean", "--plan", str(tmp_path))
+
+    assert result.returncode == 2
+    assert "Manifest is stale" in result.stderr
+    assert result.stdout == ""
+
+
 def test_clean_plan_refuses_missing_manifest_without_placeholder(tmp_path) -> None:
     seed_cleanup_target(tmp_path)
 

@@ -22,6 +22,16 @@ Version 1 supports:
 
 Version 1 does not delete files, call external LLM APIs, call embedding providers, or make IDE-specific assumptions.
 
+## Usage Timing Contract
+
+Agents must run `classify` before building context from a project folder. The tool is a pre-read gate, not an afterthought once the agent has already consumed the folder.
+
+Agents must rerun `classify` when any included document is added, removed, renamed, or modified after the manifest timestamp. If the manifest is missing or older than the scanned files, agents must treat it as stale and regenerate it before deciding which files to read.
+
+`clean --plan` and `clean --apply` must use a current manifest. If the manifest is stale, the CLI should fail with a clear error unless the user passes an explicit rescan option.
+
+Automatic filesystem watch mode is not part of v1. The v1 contract is command-triggered: agents call it at the required moments, and later integrations can add watch or scheduled rerun behavior on top.
+
 ## Architecture
 
 The project is a Python package managed by `uv`.
@@ -176,4 +186,3 @@ Version 1 excludes:
 - global knowledge base
 - automatic merge or rewrite of conflicting documents
 - hidden cleanup decisions without manifest evidence
-

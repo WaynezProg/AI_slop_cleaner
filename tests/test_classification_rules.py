@@ -219,6 +219,42 @@ def test_direct_requirement_conflict_is_flagged(tmp_path) -> None:
     }
 
 
+def test_chinese_direct_requirement_conflict_is_flagged(tmp_path) -> None:
+    (tmp_path / "auth-a.md").write_text(
+        "# 權限\n產品必須支援單一登入。\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "auth-b.md").write_text(
+        "# 權限\n產品不得支援單一登入。\n",
+        encoding="utf-8",
+    )
+
+    results = classify_records(scan_documents(tmp_path))
+
+    assert {result.path: result.category for result in results} == {
+        "auth-a.md": "conflict",
+        "auth-b.md": "conflict",
+    }
+
+
+def test_chinese_include_requirement_conflict_is_flagged(tmp_path) -> None:
+    (tmp_path / "audit-a.md").write_text(
+        "# 稽核\n系統應包含操作紀錄。\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "audit-b.md").write_text(
+        "# 稽核\n系統不得包含操作紀錄。\n",
+        encoding="utf-8",
+    )
+
+    results = classify_records(scan_documents(tmp_path))
+
+    assert {result.path: result.category for result in results} == {
+        "audit-a.md": "conflict",
+        "audit-b.md": "conflict",
+    }
+
+
 def test_capability_family_verbs_conflict_for_same_object(tmp_path) -> None:
     (tmp_path / "auth-a.md").write_text(
         "# Auth\nThe product must support SSO.\n",

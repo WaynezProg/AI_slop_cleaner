@@ -4,6 +4,8 @@ AI Slop Cleaner is a CLI-first context hygiene tool for coding agents.
 
 It classifies project documents before an agent reads them, writes a traceable manifest, and can move safe cleanup candidates into quarantine. It never deletes files in v1.
 
+V1 is a CLI scaffold, not a production-ready document parser.
+
 ## Install For Local Development
 
 ```bash
@@ -37,11 +39,13 @@ If any included file is added, removed, renamed, or modified after `ai-slop-mani
 
 ## Document Scope
 
-Version 1 only scans document-like extensions:
+Version 1 only considers document-like extensions:
 
 ```text
 .adoc .asciidoc .doc .docx .md .markdown .mdx .odt .org .pdf .rst .txt
 ```
+
+Content extraction is UTF-8 text only. Binary formats such as `.pdf`, `.docx`, `.doc`, and `.odt` are recognized by extension, but v1 does not parse their internal content. Files that are binary or cannot be decoded are marked `needs_review`.
 
 Repository control files such as `.gitignore`, `.python-version`, lock files, config files, source files, dependency folders, build folders, and `.ai-slop` internals are outside the classification scope.
 
@@ -95,3 +99,5 @@ Restore never overwrites an existing destination path.
 ## V1 Boundaries
 
 Version 1 is deterministic and offline. It does not call external LLM APIs, does not call embedding providers, does not delete files, and does not include an IDE extension or MCP server implementation.
+
+Not implemented in v1: native PDF parsing, native Word/OpenDocument parsing, OCR, semantic embeddings, and full multilingual requirement extraction.

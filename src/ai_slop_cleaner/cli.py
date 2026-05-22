@@ -4,7 +4,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, cast
 
 from ai_slop_cleaner.core import (
     StaleManifestError,
@@ -124,9 +124,13 @@ def _print_cli_error(parser: argparse.ArgumentParser, error: Exception) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    handler = cast(
+        Callable[[argparse.Namespace, argparse.ArgumentParser], int],
+        args.handler,
+    )
 
     try:
-        return args.handler(args, args.command_parser)
+        return handler(args, args.command_parser)
     except (StaleManifestError, OSError, RuntimeError, json.JSONDecodeError) as error:
         _print_cli_error(args.command_parser, error)
         return 2

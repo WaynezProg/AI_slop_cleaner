@@ -24,8 +24,8 @@ def build_manifest(
     generated_at_epoch = time.time()
     records_by_path = {record.relative_path: record for record in records}
     sorted_results = sorted(results, key=lambda result: result.path)
-    categories = {category: [] for category in CATEGORIES}
-    files = []
+    categories: dict[str, list[str]] = {category: [] for category in CATEGORIES}
+    files: list[dict[str, Any]] = []
 
     for result in sorted_results:
         record = records_by_path[result.path]

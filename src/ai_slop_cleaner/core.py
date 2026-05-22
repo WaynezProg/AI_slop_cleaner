@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from ai_slop_cleaner.classifier import classify_records
 from ai_slop_cleaner.manifest_writer import build_manifest, write_manifest
@@ -39,7 +39,7 @@ def load_manifest(target: str | Path) -> dict[str, Any]:
         raise RuntimeError(f"Refusing to read manifest through symlink: {path}")
     if path.exists() and not path.is_file():
         raise RuntimeError(f"Manifest path is not a regular file: {path}")
-    return json.loads(path.read_text(encoding="utf-8"))
+    return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
 
 
 def manifest_is_current(target: str | Path, manifest: dict[str, Any]) -> bool:

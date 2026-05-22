@@ -14,9 +14,20 @@ ai-slop = "ai_slop_cleaner.cli:main"
 
 [dependency-groups]
 dev = [
+    "mypy>=1.10",
     "pytest>=8.2",
+    "ruff>=0.6",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src"]

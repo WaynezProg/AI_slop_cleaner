@@ -33,6 +33,18 @@ If any included file is added, removed, renamed, or modified after `ai-slop-mani
 
 `clean --plan` and `clean --apply` refuse stale manifests unless `--rescan` is passed.
 
+`clean --apply` rewrites `ai-slop-manifest.json` after files are moved, so the remaining project documents have a current manifest.
+
+## Document Scope
+
+Version 1 only scans document-like extensions:
+
+```text
+.adoc .asciidoc .doc .docx .md .markdown .mdx .odt .org .pdf .rst .txt
+```
+
+Repository control files such as `.gitignore`, `.python-version`, lock files, config files, source files, dependency folders, build folders, and `.ai-slop` internals are outside the classification scope.
+
 ## Categories
 
 Manifest categories:

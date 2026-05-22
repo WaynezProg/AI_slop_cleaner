@@ -6,7 +6,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from ai_slop_cleaner.core import StaleManifestError, classify_path, ensure_current_manifest
+from ai_slop_cleaner.core import (
+    StaleManifestError,
+    classify_path,
+    ensure_current_manifest,
+    manifest_max_bytes,
+)
 from ai_slop_cleaner.models import CATEGORIES, MANIFEST_NAME
 from ai_slop_cleaner.quarantine import apply_cleanup, plan_cleanup, restore_quarantine
 
@@ -84,7 +89,13 @@ def _handle_clean(args: argparse.Namespace, parser: argparse.ArgumentParser) -> 
         return 0
 
     run_path = apply_cleanup(args.path, manifest)
-    _print_json({"quarantine_run_path": str(run_path)})
+    classify_path(args.path, max_bytes=manifest_max_bytes(manifest))
+    _print_json(
+        {
+            "quarantine_run_path": str(run_path),
+            "manifest_path": str(Path(args.path).resolve() / MANIFEST_NAME),
+        }
+    )
     return 0
 
 
@@ -116,7 +127,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         return args.handler(args, args.command_parser)
-    except (StaleManifestError, OSError) as error:
+    except (StaleManifestError, OSError, RuntimeError, json.JSONDecodeError) as error:
         _print_cli_error(args.command_parser, error)
         return 2
 

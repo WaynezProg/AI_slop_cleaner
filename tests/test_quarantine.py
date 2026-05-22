@@ -23,6 +23,18 @@ def test_plan_cleanup_writes_plan_and_does_not_move_duplicate(tmp_path) -> None:
     assert (tmp_path / ".ai-slop" / "cleanup-plan.json").is_file()
 
 
+def test_plan_cleanup_ignores_repo_control_files(tmp_path) -> None:
+    (tmp_path / ".gitignore").write_text(".venv\n", encoding="utf-8")
+    (tmp_path / ".python-version").write_text("3.13\n", encoding="utf-8")
+    (tmp_path / "notes.md").write_text("todo\n", encoding="utf-8")
+
+    manifest = classify_path(tmp_path)
+    plan = plan_cleanup(tmp_path, manifest)
+
+    assert {entry["path"] for entry in manifest["files"]} == {"notes.md"}
+    assert {move["original_path"] for move in plan["moves"]} == {"notes.md"}
+
+
 def test_apply_cleanup_moves_only_eligible_categories(tmp_path) -> None:
     (tmp_path / "same.md").write_text("# Same\n", encoding="utf-8")
     (tmp_path / "same-copy.md").write_text("# Same\n", encoding="utf-8")
@@ -213,3 +225,23 @@ def test_restore_quarantine_treats_broken_symlink_destination_as_existing(tmp_pa
     assert destination.is_symlink()
     assert not destination.exists()
     assert (run_path / moved_path).is_file()
+
+
+def test_restore_quarantine_skips_destination_with_symlink_parent(tmp_path) -> None:
+    target = tmp_path / "target"
+    external = tmp_path / "external"
+    target.mkdir()
+    external.mkdir()
+    (target / "docs").mkdir()
+    (target / "docs" / "scratch.md").write_text("todo\n", encoding="utf-8")
+    manifest = classify_path(target)
+    run_path = apply_cleanup(target, manifest)
+
+    shutil.rmtree(target / "docs")
+    (target / "docs").symlink_to(external, target_is_directory=True)
+    result = restore_quarantine(run_path)
+
+    assert result["restored"] == []
+    assert result["skipped"] == [{"path": "docs/scratch.md", "reason": "unsafe_destination"}]
+    assert not (external / "scratch.md").exists()
+    assert (run_path / "docs" / "scratch.md").is_file()

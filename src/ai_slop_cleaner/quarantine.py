@@ -96,16 +96,22 @@ def apply_cleanup(
 
 def restore_quarantine(quarantine_run_path: str | Path) -> dict[str, Any]:
     run_path = Path(quarantine_run_path).resolve()
-    move_log = json.loads((run_path / "move-log.json").read_text(encoding="utf-8"))
+    move_log = _load_move_log(run_path)
     target_path = _restore_target_path(run_path)
 
     restored = []
     skipped = []
     for entry in move_log:
+        if not isinstance(entry, dict):
+            raise RuntimeError("Quarantine move log contains an invalid entry.")
         if entry.get("status") != "moved":
             continue
-        original_path = entry["original_path"]
+        original_path = entry.get("original_path")
+        if not isinstance(original_path, str):
+            raise RuntimeError("Quarantine move log contains an invalid entry.")
         quarantine_path = entry.get("quarantine_path", original_path)
+        if not isinstance(quarantine_path, str):
+            raise RuntimeError("Quarantine move log contains an invalid entry.")
         if not _is_safe_relative_path(original_path) or not _is_safe_relative_path(quarantine_path):
             skipped.append({"path": original_path, "reason": "unsafe_path"})
             continue
@@ -114,6 +120,9 @@ def restore_quarantine(quarantine_run_path: str | Path) -> dict[str, Any]:
         destination = target_path / original_path
         if destination.exists() or destination.is_symlink():
             skipped.append({"path": original_path, "reason": "destination_exists"})
+            continue
+        if not _is_safe_restore_destination(destination, target_path):
+            skipped.append({"path": original_path, "reason": "unsafe_destination"})
             continue
         if not source.exists():
             skipped.append({"path": original_path, "reason": "quarantine_source_missing"})
@@ -136,6 +145,17 @@ def _unique_run_path(quarantine_root: Path) -> Path:
     return candidate
 
 
+def _load_move_log(run_path: Path) -> list[Any]:
+    try:
+        move_log = json.loads((run_path / "move-log.json").read_text(encoding="utf-8"))
+    except FileNotFoundError as error:
+        raise RuntimeError("Quarantine move log is missing.") from error
+
+    if not isinstance(move_log, list):
+        raise RuntimeError("Quarantine move log must be a list.")
+    return move_log
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -150,6 +170,24 @@ def _restore_target_path(run_path: Path) -> Path:
     if not isinstance(target_path, str) or not target_path:
         raise RuntimeError("Quarantine run metadata is missing target_path.")
     return Path(target_path).resolve()
+
+
+def _is_safe_restore_destination(destination: Path, target_path: Path) -> bool:
+    root = target_path.resolve()
+    try:
+        destination.resolve(strict=False).relative_to(root)
+        relative = destination.relative_to(root)
+    except (OSError, ValueError):
+        return False
+
+    cursor = root
+    for part in relative.parts[:-1]:
+        cursor = cursor / part
+        if cursor.is_symlink():
+            return False
+        if cursor.exists() and not cursor.is_dir():
+            return False
+    return True
 
 
 def _write_json(path: Path, data: Any) -> None:

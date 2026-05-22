@@ -59,7 +59,7 @@ def manifest_is_current(target: str | Path, manifest: dict[str, Any]) -> bool:
             return False
         manifest_snapshot[path] = (file_hash, size, float(mtime))
 
-    max_bytes = _manifest_max_bytes(manifest)
+    max_bytes = manifest_max_bytes(manifest)
     current_snapshot = {
         record.relative_path: (
             record.hash,
@@ -91,13 +91,13 @@ def ensure_current_manifest(
         return manifest
 
     if rescan:
-        return classify_path(root, max_bytes=_manifest_max_bytes(manifest))
+        return classify_path(root, max_bytes=manifest_max_bytes(manifest))
     raise StaleManifestError(
         f"Manifest is stale. Run ai-slop classify {root} or pass --rescan to clean."
     )
 
 
-def _manifest_max_bytes(manifest: dict[str, Any]) -> int:
+def manifest_max_bytes(manifest: dict[str, Any]) -> int:
     scanner_config = manifest.get("scanner_config", {})
     if not isinstance(scanner_config, dict):
         return 1_000_000

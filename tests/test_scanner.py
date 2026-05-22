@@ -102,7 +102,7 @@ def test_scan_documents_skips_dependency_and_build_artifact_folders(tmp_path) ->
 
 
 def test_scan_documents_marks_binary_file(tmp_path) -> None:
-    binary_path = tmp_path / "blob.bin"
+    binary_path = tmp_path / "blob.pdf"
     binary_path.write_bytes(b"abc\x00def")
 
     records = scan_documents(tmp_path)

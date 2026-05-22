@@ -30,6 +30,20 @@ IGNORE_DIRS = {
     ".mypy_cache",
     ".ruff_cache",
 }
+DOCUMENT_EXTENSIONS = {
+    ".adoc",
+    ".asciidoc",
+    ".doc",
+    ".docx",
+    ".md",
+    ".markdown",
+    ".mdx",
+    ".odt",
+    ".org",
+    ".pdf",
+    ".rst",
+    ".txt",
+}
 
 
 def scan_documents(target: str | Path, *, max_bytes: int = 1_000_000) -> list[DocumentRecord]:
@@ -50,7 +64,9 @@ def _is_ignored(path: Path, root: Path) -> bool:
     relative = path.relative_to(root)
     if path.name == MANIFEST_NAME:
         return True
-    return any(part in IGNORE_DIRS for part in relative.parts)
+    if any(part in IGNORE_DIRS for part in relative.parts):
+        return True
+    return path.suffix.lower() not in DOCUMENT_EXTENSIONS
 
 
 def _scan_file(path: Path, root: Path, *, max_bytes: int) -> DocumentRecord:

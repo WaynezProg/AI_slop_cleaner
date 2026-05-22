@@ -139,3 +139,48 @@ def test_clean_apply_and_restore_print_machine_readable_json(tmp_path) -> None:
     assert restore_output["skipped"] == []
     assert (tmp_path / "same-copy.md").is_file()
     assert (tmp_path / "summary.md").is_file()
+
+
+def test_clean_apply_rewrites_manifest_so_followup_plan_is_current(tmp_path) -> None:
+    seed_cleanup_target(tmp_path)
+    assert run_cli("classify", str(tmp_path)).returncode == 0
+
+    apply_result = run_cli("clean", "--apply", str(tmp_path))
+    plan_result = run_cli("clean", "--plan", str(tmp_path))
+
+    assert apply_result.returncode == 0
+    assert plan_result.returncode == 0
+    output = json.loads(plan_result.stdout)
+    assert output["move_count"] == 0
+    assert output["moves"] == []
+    assert plan_result.stderr == ""
+
+
+def test_restore_missing_run_metadata_reports_cli_error_without_traceback(tmp_path) -> None:
+    run_path = tmp_path / ".ai-slop" / "quarantine" / "run"
+    run_path.mkdir(parents=True)
+    (run_path / "move-log.json").write_text("[]\n", encoding="utf-8")
+
+    result = run_cli("restore", str(run_path))
+
+    assert result.returncode == 2
+    assert "run metadata" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert result.stdout == ""
+
+
+def test_restore_invalid_move_log_reports_cli_error_without_traceback(tmp_path) -> None:
+    run_path = tmp_path / ".ai-slop" / "quarantine" / "run"
+    run_path.mkdir(parents=True)
+    (run_path / "run.json").write_text(
+        json.dumps({"target_path": str(tmp_path)}) + "\n",
+        encoding="utf-8",
+    )
+    (run_path / "move-log.json").write_text("[null]\n", encoding="utf-8")
+
+    result = run_cli("restore", str(run_path))
+
+    assert result.returncode == 2
+    assert "move log contains an invalid entry" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert result.stdout == ""

@@ -101,6 +101,18 @@ def test_scan_documents_skips_dependency_and_build_artifact_folders(tmp_path) ->
     assert [record.relative_path for record in records] == ["live.md"]
 
 
+def test_scan_documents_skips_symlink_files(tmp_path) -> None:
+    external = tmp_path / "external.md"
+    external.write_text("# External\n", encoding="utf-8")
+    linked = tmp_path / "linked.md"
+    linked.symlink_to(external)
+    (tmp_path / "live.md").write_text("# Live\n", encoding="utf-8")
+
+    records = scan_documents(tmp_path)
+
+    assert [record.relative_path for record in records] == ["external.md", "live.md"]
+
+
 def test_scan_documents_marks_binary_file(tmp_path) -> None:
     binary_path = tmp_path / "blob.pdf"
     binary_path.write_bytes(b"abc\x00def")

@@ -96,6 +96,28 @@ def test_manifest_is_current_returns_false_for_target_path_mismatch(tmp_path) ->
     assert manifest_is_current(tmp_path, manifest) is False
 
 
+def test_manifest_is_current_returns_false_when_classification_is_tampered(tmp_path) -> None:
+    (tmp_path / "spec.md").write_text("# Spec\n", encoding="utf-8")
+    manifest = classify_path(tmp_path)
+    manifest["files"][0]["category"] = "low_value"
+    manifest["categories"]["canonical"] = []
+    manifest["categories"]["low_value"] = ["spec.md"]
+
+    assert manifest_is_current(tmp_path, manifest) is False
+
+
+def test_classify_path_rejects_manifest_symlink(tmp_path) -> None:
+    external = tmp_path / "external.json"
+    external.write_text("do not overwrite\n", encoding="utf-8")
+    (tmp_path / "spec.md").write_text("# Spec\n", encoding="utf-8")
+    (tmp_path / MANIFEST_NAME).symlink_to(external)
+
+    with pytest.raises(RuntimeError, match="symlink"):
+        classify_path(tmp_path)
+
+    assert external.read_text(encoding="utf-8") == "do not overwrite\n"
+
+
 def test_ensure_current_manifest_raises_when_manifest_missing_and_rescan_false(tmp_path) -> None:
     with pytest.raises(StaleManifestError, match="Manifest not found") as error:
         ensure_current_manifest(tmp_path)

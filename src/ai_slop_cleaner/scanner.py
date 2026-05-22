@@ -51,7 +51,7 @@ def scan_documents(target: str | Path, *, max_bytes: int = 1_000_000) -> list[Do
     records: list[DocumentRecord] = []
 
     for path in sorted(root.rglob("*")):
-        if not path.is_file():
+        if path.is_symlink() or not path.is_file():
             continue
         if _is_ignored(path, root):
             continue

@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from ai_slop_cleaner.io_utils import write_json_file
 from ai_slop_cleaner.models import MOVABLE_CATEGORIES
 
 
@@ -33,7 +34,7 @@ def plan_cleanup(
             continue
         if not _is_safe_relative_path(original_path):
             continue
-        if not (root / original_path).is_file():
+        if not _is_safe_cleanup_source(root / original_path, root):
             continue
 
         moves.append(
@@ -90,6 +91,11 @@ def apply_cleanup(
         original_path = move["original_path"]
         source = root / original_path
         destination = run_path / original_path
+        if not _is_safe_cleanup_source(source, root):
+            move_log[index]["status"] = "skipped"
+            move_log[index]["skip_reason"] = "unsafe_source"
+            _write_json(run_path / "move-log.json", move_log)
+            continue
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(source), str(destination))
         move_log[index]["status"] = "moved"
@@ -228,9 +234,20 @@ def _is_safe_quarantine_source(source: Path, run_path: Path) -> bool:
     return True
 
 
+def _is_safe_cleanup_source(source: Path, root: Path) -> bool:
+    if source.is_symlink():
+        return False
+    if not source.is_file():
+        return False
+    try:
+        source.resolve(strict=True).relative_to(root)
+    except (OSError, ValueError):
+        return False
+    return True
+
+
 def _write_json(path: Path, data: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_json_file(path, data)
 
 
 def _is_safe_relative_path(value: str) -> bool:

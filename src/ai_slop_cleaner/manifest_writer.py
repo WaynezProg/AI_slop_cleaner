@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import json
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from ai_slop_cleaner.io_utils import write_json_file
 from ai_slop_cleaner.models import (
     CATEGORIES,
     MANIFEST_NAME,
@@ -46,5 +46,5 @@ def build_manifest(
 
 def write_manifest(target: str | Path, manifest: dict[str, Any]) -> Path:
     path = Path(target).resolve() / MANIFEST_NAME
-    path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_json_file(path, manifest)
     return path

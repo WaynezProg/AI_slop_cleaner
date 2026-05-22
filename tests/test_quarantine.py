@@ -216,6 +216,21 @@ def test_plan_cleanup_rejects_ai_slop_symlink(tmp_path) -> None:
     assert not (external / "cleanup-plan.json").exists()
 
 
+def test_plan_cleanup_rejects_cleanup_plan_symlink(tmp_path) -> None:
+    external = tmp_path / "external.json"
+    external.write_text("do not overwrite\n", encoding="utf-8")
+    internal = tmp_path / ".ai-slop"
+    internal.mkdir()
+    (internal / "cleanup-plan.json").symlink_to(external)
+    (tmp_path / "notes.md").write_text("todo\n", encoding="utf-8")
+    manifest = classify_path(tmp_path)
+
+    with pytest.raises(RuntimeError, match="symlink"):
+        plan_cleanup(tmp_path, manifest)
+
+    assert external.read_text(encoding="utf-8") == "do not overwrite\n"
+
+
 def test_apply_cleanup_rejects_quarantine_symlink(tmp_path) -> None:
     external = tmp_path / "external"
     external.mkdir()
@@ -230,6 +245,32 @@ def test_apply_cleanup_rejects_quarantine_symlink(tmp_path) -> None:
 
     assert (tmp_path / "notes.md").is_file()
     assert list(external.iterdir()) == []
+
+
+def test_plan_cleanup_skips_symlink_source_from_manifest(tmp_path) -> None:
+    external = tmp_path / "external.md"
+    external.write_text("todo\n", encoding="utf-8")
+    linked = tmp_path / "linked.md"
+    linked.symlink_to(external)
+    manifest = {
+        "files": [
+            {
+                "path": "linked.md",
+                "category": "low_value",
+                "confidence": 0.99,
+                "reason": "test",
+                "related_files": [],
+            }
+        ]
+    }
+
+    plan = plan_cleanup(tmp_path, manifest)
+    run_path = apply_cleanup(tmp_path, manifest)
+
+    assert plan["moves"] == []
+    assert linked.is_symlink()
+    assert external.is_file()
+    assert json.loads((run_path / "move-log.json").read_text(encoding="utf-8")) == []
 
 
 def test_restore_quarantine_uses_apply_target_not_manifest_target_path(tmp_path) -> None:

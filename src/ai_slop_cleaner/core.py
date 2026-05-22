@@ -66,15 +66,25 @@ def manifest_is_current(target: str | Path, manifest: dict[str, Any]) -> bool:
         manifest_snapshot[path] = (file_hash, size, float(mtime))
 
     max_bytes = manifest_max_bytes(manifest)
+    records = scan_documents(target, max_bytes=max_bytes)
     current_snapshot = {
         record.relative_path: (
             record.hash,
             record.size,
             record.mtime,
         )
-        for record in scan_documents(target, max_bytes=max_bytes)
+        for record in records
     }
-    return current_snapshot == manifest_snapshot
+    if current_snapshot != manifest_snapshot:
+        return False
+
+    current_manifest = build_manifest(
+        root,
+        records,
+        classify_records(records),
+        {"max_bytes": max_bytes},
+    )
+    return _classification_snapshot(manifest) == _classification_snapshot(current_manifest)
 
 
 def ensure_current_manifest(
@@ -112,3 +122,29 @@ def manifest_max_bytes(manifest: dict[str, Any]) -> int:
     if isinstance(max_bytes, int) and max_bytes > 0:
         return max_bytes
     return 1_000_000
+
+
+def _classification_snapshot(manifest: dict[str, Any]) -> dict[str, Any]:
+    files = manifest.get("files")
+    if not isinstance(files, list):
+        return {}
+
+    return {
+        "categories": manifest.get("categories"),
+        "files": [
+            {
+                key: entry.get(key)
+                for key in (
+                    "path",
+                    "category",
+                    "confidence",
+                    "signals",
+                    "reason",
+                    "related_files",
+                    "errors",
+                )
+            }
+            for entry in files
+            if isinstance(entry, dict)
+        ],
+    }

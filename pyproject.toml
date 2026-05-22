@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ai-slop-cleaner"
+version = "0.1.0"
+description = "CLI scaffold for AI Slop Cleaner."
+readme = "README.md"
+requires-python = ">=3.12"
+
+[project.scripts]
+ai-slop = "ai_slop_cleaner.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

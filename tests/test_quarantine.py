@@ -100,6 +100,46 @@ def test_restore_quarantine_restores_moved_files(tmp_path) -> None:
     assert not (run_path / moved_path).exists()
 
 
+def test_restore_quarantine_continues_when_one_move_fails(tmp_path, monkeypatch) -> None:
+    import ai_slop_cleaner.quarantine as quarantine
+
+    (tmp_path / "a.md").write_text("# Same\n", encoding="utf-8")
+    (tmp_path / "b.md").write_text("# Same\n", encoding="utf-8")
+    (tmp_path / "c.md").write_text("todo\n", encoding="utf-8")
+    (tmp_path / "d.md").write_text("fixme\n", encoding="utf-8")
+    manifest = classify_path(tmp_path)
+    run_path = apply_cleanup(tmp_path, manifest)
+    move_log = json.loads((run_path / "move-log.json").read_text(encoding="utf-8"))
+    moved_paths = [entry["original_path"] for entry in move_log if entry["status"] == "moved"]
+    assert len(moved_paths) >= 3
+    failing_path = moved_paths[1]
+    real_move = shutil.move
+    move_count = 0
+
+    def fail_second_restore_move(source, destination):
+        nonlocal move_count
+        move_count += 1
+        if move_count == 2:
+            raise OSError("forced restore move failure")
+        return real_move(source, destination)
+
+    monkeypatch.setattr(quarantine.shutil, "move", fail_second_restore_move)
+
+    result = restore_quarantine(run_path)
+
+    assert result["skipped"] == [
+        {
+            "path": failing_path,
+            "reason": "restore_failed",
+            "error": "forced restore move failure",
+        }
+    ]
+    assert {entry["path"] for entry in result["restored"]} == set(moved_paths) - {failing_path}
+    assert (run_path / failing_path).is_file()
+    for restored_path in set(moved_paths) - {failing_path}:
+        assert (tmp_path / restored_path).is_file()
+
+
 def test_apply_cleanup_run_path_is_collision_safe(tmp_path, monkeypatch) -> None:
     import ai_slop_cleaner.quarantine as quarantine
 

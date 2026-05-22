@@ -156,6 +156,25 @@ def test_clean_apply_rewrites_manifest_so_followup_plan_is_current(tmp_path) -> 
     assert plan_result.stderr == ""
 
 
+def test_clean_apply_rejects_manifest_symlink_before_moving_files(tmp_path) -> None:
+    seed_cleanup_target(tmp_path)
+    assert run_cli("classify", str(tmp_path)).returncode == 0
+    manifest_path = tmp_path / MANIFEST_NAME
+    external_manifest = tmp_path / "external-manifest.json"
+    external_manifest.write_text(manifest_path.read_text(encoding="utf-8"), encoding="utf-8")
+    manifest_path.unlink()
+    manifest_path.symlink_to(external_manifest)
+
+    result = run_cli("clean", "--apply", str(tmp_path))
+
+    assert result.returncode == 2
+    assert "symlink" in result.stderr
+    assert result.stdout == ""
+    assert (tmp_path / "same-copy.md").is_file()
+    assert (tmp_path / "summary.md").is_file()
+    assert not (tmp_path / ".ai-slop" / "quarantine").exists()
+
+
 def test_restore_missing_run_metadata_reports_cli_error_without_traceback(tmp_path) -> None:
     run_path = tmp_path / ".ai-slop" / "quarantine" / "run"
     run_path.mkdir(parents=True)

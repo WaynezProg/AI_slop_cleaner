@@ -35,6 +35,10 @@ def classify_path(
 
 def load_manifest(target: str | Path) -> dict[str, Any]:
     path = Path(target).resolve() / MANIFEST_NAME
+    if path.is_symlink():
+        raise RuntimeError(f"Refusing to read manifest through symlink: {path}")
+    if path.exists() and not path.is_file():
+        raise RuntimeError(f"Manifest path is not a regular file: {path}")
     return json.loads(path.read_text(encoding="utf-8"))
 
 

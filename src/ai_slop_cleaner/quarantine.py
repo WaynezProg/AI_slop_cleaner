@@ -143,8 +143,18 @@ def restore_quarantine(quarantine_run_path: str | Path) -> dict[str, Any]:
             skipped.append({"path": original_path, "reason": "unsafe_quarantine_source"})
             continue
 
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(source), str(destination))
+        try:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(source), str(destination))
+        except OSError as error:
+            skipped.append(
+                {
+                    "path": original_path,
+                    "reason": "restore_failed",
+                    "error": str(error),
+                }
+            )
+            continue
         restored.append({"path": original_path})
 
     return {"restored": restored, "skipped": skipped}
